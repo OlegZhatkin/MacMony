@@ -14,7 +14,8 @@ struct MenuBarLabel: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            Image(systemName: "waveform.path.ecg")
+            Image("MenuBarIcon")
+                .renderingMode(.template)   // тонируется системой под тему строки меню
             if !items.isEmpty {
                 Text(text)
                     .font(.system(size: 11, weight: .medium, design: .monospaced))

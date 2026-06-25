@@ -1,100 +1,122 @@
 import SwiftUI
 
-/// Главное окно со всеми метриками в стиле liquid glass.
+/// Главное окно: градиентный фон + стеклянные карточки (метрики и настройки).
+/// Настройки встроены в тот же popover (inline), а НЕ в отдельный sheet — иначе
+/// MenuBarExtra-окно теряло фокус и закрывалось при клике по контролу.
 struct PopoverView: View {
     @EnvironmentObject var store: MetricsStore
     @State private var showSettings = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            header
-
-            VStack(spacing: 12) {
-                MetricRow(icon: "cpu",
-                          label: "CPU",
-                          value: String(format: "%.0f%%", store.cpuUsage),
-                          fraction: store.cpuUsage / 100,
-                          status: store.cpuStatus,
-                          accent: Theme.cpuAccent)
-
-                MetricRow(icon: "thermometer.medium",
-                          label: "Температура",
-                          value: Fmt.temp(store.cpuTemp),
-                          fraction: tempFraction,
-                          status: store.tempStatus)
-
-                MetricRow(icon: "memorychip",
-                          label: "RAM",
-                          value: ramValue,
-                          fraction: store.memory.percent / 100,
-                          status: store.ramStatus)
-
-                fansSection
+        VStack(spacing: 14) {
+            metricsCard
+            if showSettings {
+                SettingsCard()
+                    .environmentObject(store)
+                    .transition(.move(edge: .top).combined(with: .opacity))
             }
-
-            Divider().opacity(0.5)
-            NetworkFooter(down: store.network.downBytesPerSec, up: store.network.upBytesPerSec)
+            footer
         }
-        .padding(16)
+        .padding(14)
         .frame(width: Theme.popoverWidth)
-        .background(GlassBackground())
-        .sheet(isPresented: $showSettings) {
-            SettingsView().environmentObject(store)
+        .background(Theme.bgGradient)
+    }
+
+    // MARK: - Карточка метрик
+
+    private var metricsCard: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 14) {
+                header
+
+                VStack(spacing: 13) {
+                    MetricRow(icon: "cpu",
+                              label: "CPU",
+                              value: String(format: "%.0f%%", store.cpuUsage),
+                              fraction: store.cpuUsage / 100,
+                              status: store.cpuStatus,
+                              accent: Theme.cpuAccent)
+
+                    MetricRow(icon: "thermometer.medium",
+                              label: "Температура CPU",
+                              value: Fmt.temp(store.cpuTemp),
+                              fraction: tempFraction,
+                              status: store.tempStatus)
+
+                    MetricRow(icon: "memorychip",
+                              label: "Память",
+                              value: ramValue,
+                              fraction: store.memory.percent / 100,
+                              status: store.ramStatus,
+                              accent: Theme.ramAccent)
+
+                    fanRow
+                }
+
+                Divider().overlay(Color.white.opacity(0.12))
+                NetworkFooter(down: store.network.downBytesPerSec, up: store.network.upBytesPerSec)
+            }
         }
     }
 
     private var header: some View {
         HStack(spacing: 8) {
-            Image(systemName: "waveform.path.ecg")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(Theme.cpuAccent)
-            Text("MacMon")
-                .font(.system(size: 14, weight: .semibold))
+            Image("MenuBarIcon")
+                .renderingMode(.template)
+                .foregroundStyle(Theme.normal)
+            Text("MacMon").font(.system(size: 15, weight: .semibold))
             Spacer()
-            Button { store.refresh() } label: {
-                Image(systemName: "arrow.clockwise")
+            iconButton("arrow.clockwise", help: "Обновить") { store.refresh() }
+            iconButton("gearshape", help: "Настройки") {
+                withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                    showSettings.toggle()
+                }
             }
-            .buttonStyle(.plain)
-            .help("Обновить")
-
-            Button { showSettings = true } label: {
-                Image(systemName: "gearshape")
-            }
-            .buttonStyle(.plain)
-            .help("Настройки")
-
-            Button { NSApp.terminate(nil) } label: {
-                Image(systemName: "power")
-            }
-            .buttonStyle(.plain)
-            .help("Выйти")
         }
-        .font(.system(size: 13))
         .foregroundStyle(.secondary)
     }
 
-    @ViewBuilder
-    private var fansSection: some View {
-        if store.fans.isEmpty {
-            MetricRow(icon: "fanblades",
-                      label: "Вентиляторы",
-                      value: "—",
-                      fraction: 0,
-                      status: .normal)
-        } else {
-            ForEach(store.fans) { fan in
-                MetricRow(icon: "fanblades",
-                          label: store.fans.count > 1 ? "Вентилятор \(fan.index + 1)" : "Вентилятор",
-                          value: "\(fan.current) RPM",
-                          fraction: fan.fraction,
-                          status: fan.status)
-            }
+    private func iconButton(_ name: String, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: name).font(.system(size: 13, weight: .semibold))
         }
+        .buttonStyle(.plain)
+        .help(help)
+    }
+
+    /// Вентиляторы — без бара, через « · ».
+    private var fanRow: some View {
+        HStack(spacing: 7) {
+            Image(systemName: "fanblades")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 16)
+            Text("Вентиляторы").font(.system(size: 12, weight: .medium))
+            Spacer(minLength: 8)
+            Text(fanValue)
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .foregroundStyle(store.fans.isEmpty ? Color.secondary : .primary)
+        }
+    }
+
+    private var fanValue: String {
+        guard !store.fans.isEmpty else { return "—" }
+        let rpms = store.fans.map { "\($0.current)" }.joined(separator: " · ")
+        return "\(rpms) RPM"
+    }
+
+    private var footer: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "arrow.clockwise")
+            Text("Данные обновляются автоматически — рефрешить вручную не нужно")
+        }
+        .font(.system(size: 10))
+        .foregroundStyle(.secondary)
+        .multilineTextAlignment(.center)
     }
 
     private var tempFraction: Double {
         guard let t = store.cpuTemp else { return 0 }
-        // Шкала примерно 30…(порог+10)°C для наглядности.
         let lo = 30.0, hi = store.tempThreshold + 10
         return max(0, min(1, (t - lo) / (hi - lo)))
     }
@@ -111,60 +133,27 @@ struct NetworkFooter: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            column(icon: "arrow.down", title: "Download", value: Fmt.speed(down), color: Theme.netDown)
-            Divider().frame(height: 28).opacity(0.4)
-            column(icon: "arrow.up", title: "Upload", value: Fmt.speed(up), color: Theme.netUp)
+            column(icon: "arrow.down", title: "Down", value: Fmt.speed(down), color: Theme.netDown)
+            Divider().frame(height: 34).overlay(Color.white.opacity(0.12))
+            column(icon: "arrow.up", title: "Up", value: Fmt.speed(up), color: Theme.netUp)
         }
     }
 
     private func column(icon: String, title: String, value: String, color: Color) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(color)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                Text(value)
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+        let parts = value.split(separator: " ", maxSplits: 1)
+        let number = String(parts.first ?? "")
+        let unit = parts.count > 1 ? String(parts[1]) : ""
+        return VStack(spacing: 3) {
+            HStack(spacing: 5) {
+                Image(systemName: icon).font(.system(size: 12, weight: .bold))
+                Text(title).font(.system(size: 12, weight: .semibold))
             }
-            Spacer(minLength: 0)
+            .foregroundStyle(color)
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(number).font(.system(size: 18, weight: .semibold, design: .monospaced))
+                Text(unit).font(.system(size: 10)).foregroundStyle(.secondary)
+            }
         }
         .frame(maxWidth: .infinity)
-        .padding(.horizontal, 4)
-    }
-}
-
-/// Системный материал (liquid glass) с тонким верхним хайлайтом.
-struct GlassBackground: View {
-    var body: some View {
-        ZStack {
-            VisualEffectBackground(material: .popover, blending: .behindWindow)
-            RoundedRectangle(cornerRadius: Theme.corner, style: .continuous)
-                .strokeBorder(
-                    LinearGradient(colors: [.white.opacity(0.25), .white.opacity(0.02)],
-                                   startPoint: .top, endPoint: .bottom),
-                    lineWidth: 1)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: Theme.corner, style: .continuous))
-    }
-}
-
-/// Обёртка над NSVisualEffectView — настоящий системный материал, адаптивный к теме.
-struct VisualEffectBackground: NSViewRepresentable {
-    var material: NSVisualEffectView.Material
-    var blending: NSVisualEffectView.BlendingMode
-
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let v = NSVisualEffectView()
-        v.material = material
-        v.blendingMode = blending
-        v.state = .active
-        return v
-    }
-    func updateNSView(_ v: NSVisualEffectView, context: Context) {
-        v.material = material
-        v.blendingMode = blending
     }
 }
