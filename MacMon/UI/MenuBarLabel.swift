@@ -13,14 +13,18 @@ struct MenuBarLabel: View {
     }
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 3) {
             Image("MenuBarIcon")
                 .renderingMode(.template)   // тонируется системой под тему строки меню
+                .resizable()
+                .scaledToFit()
+                .frame(width: 16, height: 16) // компактный размер — не раздувает клик-зону
             if !items.isEmpty {
                 Text(text)
                     .font(.system(size: 11, weight: .medium, design: .monospaced))
             }
         }
+        .fixedSize()                          // ширина по содержимому, без лишнего паддинга
     }
 
     private var text: String {
