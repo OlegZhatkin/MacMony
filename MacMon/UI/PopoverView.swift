@@ -72,6 +72,7 @@ struct PopoverView: View {
                     showSettings.toggle()
                 }
             }
+            iconButton("power", help: "Выйти") { NSApp.terminate(nil) }
         }
         .foregroundStyle(.secondary)
     }
