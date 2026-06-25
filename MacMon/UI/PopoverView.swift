@@ -61,8 +61,8 @@ struct PopoverView: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            Image("MenuBarIcon")
-                .renderingMode(.template)
+            Image(systemName: "waveform.path.ecg")
+                .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(Theme.normal)
             Text("MacMon").font(.system(size: 15, weight: .semibold))
             Spacer()

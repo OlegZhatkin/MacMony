@@ -13,18 +13,13 @@ struct MenuBarLabel: View {
     }
 
     var body: some View {
-        HStack(spacing: 2) {
-            Image("MenuBarIcon")
-                .renderingMode(.template)   // тонируется системой под тему строки меню
-                .resizable()
-                .scaledToFit()
-                .frame(width: 13, height: 13) // под размер соседних иконок строки меню
+        HStack(spacing: 4) {
+            Image(systemName: "waveform.path.ecg")   // SF Symbol — система сама масштабирует под строку меню
             if !items.isEmpty {
                 Text(text)
-                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
             }
         }
-        .fixedSize()                          // ширина по содержимому, без лишнего паддинга
     }
 
     private var text: String {
